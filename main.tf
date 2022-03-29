@@ -122,6 +122,55 @@ resource "aws_route53_resolver_firewall_rule_group_association" "this" {
 }
 
 ################################################################################
+# Network Firewall
+################################################################################
+
+resource "aws_networkfirewall_firewall" "this" {
+  count = var.create && var.create_network_firewall ? 1 : 0
+
+  name              = coalesce(var.network_firewall_name, var.name)
+  description       = var.network_firewall_description
+  delete_protection = var.network_firewall_delete_protection
+
+  firewall_policy_arn               = var.network_firewall_policy_arn
+  firewall_policy_change_protection = var.network_firewall_policy_change_protection
+
+  vpc_id                   = aws_vpc.this[0].id
+  subnet_change_protection = var.network_firewall_subnet_change_protection
+
+  dynamic "subnet_mapping" {
+    for_each = toset(var.network_firewall_subnets)
+    content {
+      subnet_id = subnet_mapping.value
+    }
+  }
+
+  tags = merge(var.tags, var.network_firewall_tags)
+}
+
+################################################################################
+# Firewall Logging Configuration
+################################################################################
+
+resource "aws_networkfirewall_logging_configuration" "this" {
+  count = var.create && var.create_network_firewall && var.create_network_firewall_logging_configuration ? 1 : 0
+
+  firewall_arn = aws_networkfirewall_firewall.this[0].arn
+
+  logging_configuration {
+    # At least one config, at most, only two blocks can be specified; one for `FLOW` logs and one for `ALERT` logs.
+    dynamic "log_destination_config" {
+      for_each = var.network_firewall_logging_configuration_destination_config
+      content {
+        log_destination      = log_destination_config.value.log_destination
+        log_destination_type = log_destination_config.value.log_destination_type
+        log_type             = log_destination_config.value.log_type
+      }
+    }
+  }
+}
+
+################################################################################
 # DHCP Options Set
 ################################################################################
 

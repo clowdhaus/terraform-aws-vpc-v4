@@ -1,32 +1,5 @@
 ################################################################################
-# Firewall
-################################################################################
-
-resource "aws_networkfirewall_firewall" "this" {
-  count = var.create ? 1 : 0
-
-  name              = var.name
-  description       = var.description
-  delete_protection = var.delete_protection
-
-  firewall_policy_arn               = var.create_firewall_policy ? aws_networkfirewall_firewall_policy.this[0].arn : var.firewall_policy_arn
-  firewall_policy_change_protection = var.firewall_policy_change_protection
-
-  vpc_id                   = var.vpc_id
-  subnet_change_protection = var.subnet_change_protection
-
-  dynamic "subnet_mapping" {
-    for_each = toset(var.subnet_mapping)
-    content {
-      subnet_id = subnet_mapping.value
-    }
-  }
-
-  tags = var.tags
-}
-
-################################################################################
-# Firewall Policy
+# Network Firewall Policy
 ################################################################################
 
 resource "aws_networkfirewall_firewall_policy" "this" {
@@ -353,28 +326,6 @@ resource "aws_networkfirewall_resource_policy" "rule_group" {
 
   resource_arn = aws_networkfirewall_rule_group.this[each.key].arn
   policy       = try(each.value.create_resource_policy, false) ? data.aws_iam_policy_document.rule_group[each.key].json : each.value.resource_policy
-}
-
-################################################################################
-# Firewall Logging Configuration
-################################################################################
-
-resource "aws_networkfirewall_logging_configuration" "this" {
-  count = var.create && var.create_logging_configuration ? 1 : 0
-
-  firewall_arn = aws_networkfirewall_firewall.this[0].arn
-
-  logging_configuration {
-    # At least one config, at most, only two blocks can be specified; one for `FLOW` logs and one for `ALERT` logs.
-    dynamic "log_destination_config" {
-      for_each = var.logging_configuration_destination_config
-      content {
-        log_destination      = log_destination_config.value.log_destination
-        log_destination_type = log_destination_config.value.log_destination_type
-        log_type             = log_destination_config.value.log_type
-      }
-    }
-  }
 }
 
 ################################################################################
